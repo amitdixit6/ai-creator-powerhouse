@@ -1,34 +1,33 @@
 from flask import Flask, render_template, request
-from diffusers import StableDiffusionPipeline
 import subprocess
 from gtts import gTTS
 from google.cloud import speech_v1p1beta1 as speech
-import cv2
 import os
 
 app = Flask(__name__)
 
-# Google Cloud Speech-to-Text setup
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "C:/ai-creator-powerhouse/speech-key.json"
 
-# Video generation function
 def generate_video(prompt):
-    print("Model download shuru – thoda wait karo...")
-    model = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
-    model = model.to("cpu")
-    image = model(prompt).images[0]
-    image.save("static/output.png")
+    # Pre-made dancing dog video
+    base_video = "static/dancing_dog.mp4"
+    print("Base video use kar rahe hain:", base_video)
 
-    subprocess.run("ffmpeg -loop 1 -i static/output.png -c:v libx264 -t 5 -pix_fmt yuv420p static/temp_video.mp4")
-
-    narration_text = prompt  # User prompt narration ke liye
+    # Narration banao
+    narration_text = prompt
     tts = gTTS(text=narration_text, lang="en", slow=False)
     tts.save("static/narration.mp3")
+    print("Narration ban gaya: static/narration.mp3")
 
-    subprocess.run("ffmpeg -i static/temp_video.mp4 -i static/narration.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 static/basic_video_with_voice.mp4")
+    # Video mein audio add karo
+    subprocess.run("ffmpeg -i static/dancing_dog.mp4 -i static/narration.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest static/temp_video.mp4 -y", shell=True)
+    print("Temp video ban gaya: static/temp_video.mp4")
 
-    subprocess.run("ffmpeg -i static/basic_video_with_voice.mp4 -vn -acodec mp3 static/temp_audio.mp3")
+    # Audio extract karo
+    subprocess.run("ffmpeg -i static/temp_video.mp4 -vn -acodec mp3 static/temp_audio.mp3 -y", shell=True)
+    print("Audio extract ho gaya: static/temp_audio.mp3")
 
+    # Subtitles banao
     client = speech.SpeechClient()
     with open("static/temp_audio.mp3", "rb") as audio_file:
         content = audio_file.read()
@@ -42,26 +41,23 @@ def generate_video(prompt):
     subtitle_text = ""
     for result in response.results:
         subtitle_text += result.alternatives[0].transcript + "\n"
+    print("Subtitles ban gaye:", subtitle_text)
     with open("static/subtitles.srt", "w") as srt_file:
         srt_file.write("1\n00:00:00,000 --> 00:00:05,000\n" + subtitle_text)
 
-    subprocess.run("ffmpeg -i static/basic_video_with_voice.mp4 -vf subtitles=static/subtitles.srt static/basic_video_with_subtitles.mp4")
+    # Subtitles add karo
+    subprocess.run("ffmpeg -i static/temp_video.mp4 -vf subtitles=static/subtitles.srt static/basic_video_with_subtitles.mp4 -y", shell=True)
+    print("Video with subtitles ban gaya: static/basic_video_with_subtitles.mp4")
 
-    video = cv2.VideoCapture("static/basic_video_with_subtitles.mp4")
-    frame_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(video.get(cv2.CAP_PROP_FPS))
-    reel_width = 1080
-    reel_height = 1920
-    out = cv2.VideoWriter("static/reel_video.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (reel_width, reel_height))
-    while video.isOpened():
-        ret, frame = video.read()
-        if not ret:
-            break
-        resized_frame = cv2.resize(frame, (reel_width, reel_height), interpolation=cv2.INTER_AREA)
-        out.write(resized_frame)
-    video.release()
-    out.release()
+    # Reels format banao
+    subprocess.run("ffmpeg -i static/basic_video_with_subtitles.mp4 -vf scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2 -c:v libx264 -c:a aac -t 5 static/reel_video.mp4 -y", shell=True)
+    print("Reel video ban gaya: static/reel_video.mp4")
+
+    # Cleanup
+    os.remove("static/narration.mp3")
+    os.remove("static/temp_audio.mp3")
+    os.remove("static/subtitles.srt")
+    os.remove("static/temp_video.mp4")
 
 @app.route("/", methods=["GET", "POST"])
 def index():
