@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Creator’s Powerhouse</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #f0f0f0; margin: 0; padding: 20px; }
+        h1 { color: #333; }
+        form { margin: 20px; }
+        input[type="text"] { padding: 10px; width: 300px; }
+        input[type="submit"] { padding: 10px 20px; background-color: #333; color: white; border: none; cursor: pointer; }
+        video { max-width: 100%; border: 2px solid #333; border-radius: 5px; margin: 10px; }
+        p { color: #666; max-width: 600px; margin: 20px auto; }
+    </style>
+</head>
+<body>
+    <h1>AI Creator’s Powerhouse</h1>
+    <p>Enter a prompt to generate a custom video with voice, subtitles, and Reels format!</p>
+    <form method="POST">
+        <input type="text" name="prompt" placeholder="Enter your prompt here" required>
+        <input type="submit" value="Generate Video">
+    </form>
+    {% if video_created %}
+        <h2>Your Generated Video with Voice and Subtitles</h2>
+        <video controls>
+            <source src="{{ url_for('static', filename='basic_video_with_subtitles.mp4') }}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        <h2>Your Reel Video</h2>
+        <video controls>
+            <source src="{{ url_for('static', filename='reel_video.mp4') }}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    {% endif %}
+    <p>Created by Amit Dixit – Powered by Stable Diffusion, gTTS, Google Speech-to-Text, OpenCV, and FFmpeg.</p>
+</body>
+</html>
