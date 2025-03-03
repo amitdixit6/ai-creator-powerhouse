@@ -5,6 +5,8 @@ from google.cloud import speech_v1p1beta1 as speech
 import os
 import json
 from google.oauth2 import service_account
+from diffusers import StableDiffusionPipeline
+import torch
 
 app = Flask(__name__)
 
@@ -19,21 +21,20 @@ if credentials_json:
 else:
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/opt/render/project/src/speech-key.json"
 
-def select_base_video(prompt):
-    # Prompt ke keywords se video select karo
-    prompt = prompt.lower()
-    if "dog" in prompt:
-        return "static/dancing_dog.mp4"
-    elif "robot" in prompt:
-        return "static/dancing_robot.mp4"
-    elif "cat" in prompt:
-        return "static/dancing_cat.mp4"
-    else:
-        return "static/dancing_dog.mp4"  # Default video
+# Stable Diffusion model load karo
+model_id = "runwayml/stable-diffusion-v1-5"
+pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float32)
+pipe = pipe.to("cpu")  # Render ke free tier pe CPU use karo
 
 def generate_video(prompt):
-    base_video = select_base_video(prompt)
-    print(f"Base video use kar rahe hain: {base_video}")
+    # Prompt se image generate karo
+    image = pipe(prompt, num_inference_steps=50).images[0]
+    image.save("static/temp_image.png")
+    print("Image ban gaya: static/temp_image.png")
+
+    # Image se short video banao (FFmpeg se looping)
+    subprocess.run("ffmpeg -loop 1 -i static/temp_image.png -c:v libx264 -t 5 -pix_fmt yuv420p static/temp_video.mp4 -y", shell=True)
+    print("Temp video ban gaya: static/temp_video.mp4")
 
     # Narration banao
     narration_text = prompt
@@ -42,11 +43,11 @@ def generate_video(prompt):
     print("Narration ban gaya: static/narration.mp3")
 
     # Video mein audio add karo
-    subprocess.run(f"ffmpeg -i {base_video} -i static/narration.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest static/temp_video.mp4 -y", shell=True)
-    print("Temp video ban gaya: static/temp_video.mp4")
+    subprocess.run("ffmpeg -i static/temp_video.mp4 -i static/narration.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest static/audio_video.mp4 -y", shell=True)
+    print("Audio video ban gaya: static/audio_video.mp4")
 
     # Audio extract karo
-    subprocess.run("ffmpeg -i static/temp_video.mp4 -vn -acodec mp3 static/temp_audio.mp3 -y", shell=True)
+    subprocess.run("ffmpeg -i static/audio_video.mp4 -vn -acodec mp3 static/temp_audio.mp3 -y", shell=True)
     print("Audio extract ho gaya: static/temp_audio.mp3")
 
     # Subtitles banao
@@ -68,7 +69,7 @@ def generate_video(prompt):
         srt_file.write("1\n00:00:00,000 --> 00:00:05,000\n" + subtitle_text)
 
     # Subtitles add karo
-    subprocess.run("ffmpeg -i static/temp_video.mp4 -vf subtitles=static/subtitles.srt static/basic_video_with_subtitles.mp4 -y", shell=True)
+    subprocess.run("ffmpeg -i static/audio_video.mp4 -vf subtitles=static/subtitles.srt static/basic_video_with_subtitles.mp4 -y", shell=True)
     print("Video with subtitles ban gaya: static/basic_video_with_subtitles.mp4")
 
     # Reels format banao
@@ -76,10 +77,12 @@ def generate_video(prompt):
     print("Reel video ban gaya: static/reel_video.mp4")
 
     # Cleanup
+    os.remove("static/temp_image.png")
+    os.remove("static/temp_video.mp4")
     os.remove("static/narration.mp3")
     os.remove("static/temp_audio.mp3")
     os.remove("static/subtitles.srt")
-    os.remove("static/temp_video.mp4")
+    os.remove("static/audio_video.mp4")
 
 @app.route("/", methods=["GET", "POST"])
 def index():
