@@ -19,9 +19,21 @@ if credentials_json:
 else:
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/opt/render/project/src/speech-key.json"
 
+def select_base_video(prompt):
+    # Prompt ke keywords se video select karo
+    prompt = prompt.lower()
+    if "dog" in prompt:
+        return "static/dancing_dog.mp4"
+    elif "robot" in prompt:
+        return "static/dancing_robot.mp4"
+    elif "cat" in prompt:
+        return "static/dancing_cat.mp4"
+    else:
+        return "static/dancing_dog.mp4"  # Default video
+
 def generate_video(prompt):
-    print("Base video use kar rahe hain: static/dancing_dog.mp4")
-    base_video = "static/dancing_dog.mp4"
+    base_video = select_base_video(prompt)
+    print(f"Base video use kar rahe hain: {base_video}")
 
     # Narration banao
     narration_text = prompt
@@ -30,7 +42,7 @@ def generate_video(prompt):
     print("Narration ban gaya: static/narration.mp3")
 
     # Video mein audio add karo
-    subprocess.run("ffmpeg -i static/dancing_dog.mp4 -i static/narration.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest static/temp_video.mp4 -y", shell=True)
+    subprocess.run(f"ffmpeg -i {base_video} -i static/narration.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest static/temp_video.mp4 -y", shell=True)
     print("Temp video ban gaya: static/temp_video.mp4")
 
     # Audio extract karo
