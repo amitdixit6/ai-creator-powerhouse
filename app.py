@@ -3,15 +3,25 @@ import subprocess
 from gtts import gTTS
 from google.cloud import speech_v1p1beta1 as speech
 import os
+import json
+from google.oauth2 import service_account
 
 app = Flask(__name__)
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "C:/ai-creator-powerhouse/speech-key.json"
+# Google Cloud credentials environment se load karo
+credentials_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+if credentials_json:
+    credentials_info = json.loads(credentials_json)
+    credentials = service_account.Credentials.from_service_account_info(credentials_info)
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/tmp/speech-key.json"
+    with open("/tmp/speech-key.json", "w") as f:
+        json.dump(credentials_info, f)
+else:
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/opt/render/project/src/speech-key.json"
 
 def generate_video(prompt):
-    # Pre-made dancing dog video
+    print("Base video use kar rahe hain: static/dancing_dog.mp4")
     base_video = "static/dancing_dog.mp4"
-    print("Base video use kar rahe hain:", base_video)
 
     # Narration banao
     narration_text = prompt
